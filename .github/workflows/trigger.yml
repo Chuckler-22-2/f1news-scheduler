@@ -1,0 +1,37 @@
+name: F1 News Trigger
+
+on:
+  schedule:
+    - cron: "17 2 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Trigger F1newsdeliver workflow
+        env:
+          PAT: ${{ secrets.DISPATCH_PAT }}
+        run: |
+          set -euo pipefail
+          curl --fail-with-body -sS -X POST \
+            -H "Authorization: Bearer $PAT" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/Chuckler-22-2/F1newsdeliver/actions/workflows/weekly-news.yml/dispatches \
+            -d '{"ref":"main"}'
+          echo "dispatched OK"
+
+      - name: Heartbeat (avoid 60-day auto-disable)
+        run: |
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > last_run.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add last_run.txt
+          git diff --staged --quiet || git commit -m "chore: heartbeat"
+          git push
