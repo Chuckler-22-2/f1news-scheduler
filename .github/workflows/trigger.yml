@@ -14,7 +14,28 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Check if delivered within last 3 days
+        id: check
+        env:
+          PAT: ${{ secrets.DISPATCH_PAT }}
+        run: |
+          set -euo pipefail
+          LAST=$(curl --fail-with-body -sS \
+            -H "Authorization: Bearer $PAT" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/Chuckler-22-2/F1newsdeliver/commits?path=sent_urls.txt&per_page=1" \
+            | jq -r '.[0].commit.committer.date // empty')
+          if [[ -n "$LAST" ]] && (( $(date -d "$LAST" +%s) > $(date -d "3 days ago" +%s) )); then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "sent_urls.txt 마지막 커밋: $LAST — 최근 3일 이내, dispatch skip"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "sent_urls.txt 마지막 커밋: ${LAST:-<없음>} — dispatch 진행"
+          fi
+
       - name: Trigger F1newsdeliver workflow
+        if: steps.check.outputs.skip != 'true'
         env:
           PAT: ${{ secrets.DISPATCH_PAT }}
         run: |
